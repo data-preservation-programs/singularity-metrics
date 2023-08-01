@@ -134,7 +134,7 @@ func updateDeal(ctx context.Context, mg *mongo.Client, id primitive.ObjectID, st
 	if result.MatchedCount == 0 {
 		return errors.Errorf("deal not found %s", id)
 	} else {
-		log.Printf("update state for deal %s: %s\n", dealID, newState)
+		log.Printf("update state for deal %d: %s\n", dealID, newState)
 	}
 	return nil
 }
