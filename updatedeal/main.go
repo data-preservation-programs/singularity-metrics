@@ -120,7 +120,7 @@ func updateDeal(ctx context.Context, mg *mongo.Client, id primitive.ObjectID, st
 		"_id": id,
 	}, bson.M{
 		"$set": bson.M{
-			"state":            state,
+			"state":            newState,
 			"dealId":           dealID,
 			"startEpoch":       marketDeal.Proposal.StartEpoch,
 			"sectorStartEpoch": marketDeal.State.SectorStartEpoch,
