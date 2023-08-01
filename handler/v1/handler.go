@@ -7,10 +7,9 @@ import (
 	"fmt"
 	"log"
 	"os"
-	"time"
 
 	"github.com/aws/aws-lambda-go/events"
-	"github.com/data-preservation-programs/singularity-metrics/model"
+	"github.com/data-preservation-programs/singularity-metrics/model/v1model"
 	"github.com/klauspost/compress/zstd"
 	"github.com/mitchellh/mapstructure"
 	"github.com/pkg/errors"
@@ -33,40 +32,6 @@ func init() {
 	}
 }
 
-type Event struct {
-	Timestamp int64          `json:"timestamp"`
-	Instance  string         `json:"instance"`
-	Type      string         `json:"type"`
-	Values    map[string]any `json:"values"`
-}
-
-type GenerationCompleteEvent struct {
-	DatasetID                   string `mapstructure:"datasetId"`
-	DatasetName                 string `mapstructure:"datasetName"`
-	GenerationID                string `mapstructure:"generationId"`
-	Index                       int64  `mapstructure:"index"`
-	PieceSize                   int64  `mapstructure:"pieceSize"`
-	PieceCID                    string `mapstructure:"pieceCid"`
-	CarSize                     int64  `mapstructure:"carSize"`
-	NumOfFiles                  int64  `mapstructure:"numOfFiles"`
-	TimeSpentInGenerationMs     int64  `mapstructure:"timeSpentInGenerationMs"`
-	TimeSpentInMovingToTmpdirMs int64  `mapstructure:"timeSpendInMovingToTmpdirMs"`
-}
-
-type DealProposalEvent struct {
-	Protocol    string  `mapstructure:"protocol"`
-	PieceCID    string  `mapstructure:"pieceCid"`
-	DataCID     string  `mapstructure:"dataCid"`
-	PieceSize   int64   `mapstructure:"pieceSize"`
-	CarSize     int64   `mapstructure:"carSize"`
-	Provider    string  `mapstructure:"provider"`
-	Client      string  `mapstructure:"client"`
-	Verified    bool    `mapstructure:"verified"`
-	Duration    int32   `mapstructure:"duration"`
-	ProposalCID string  `mapstructure:"proposalCid"`
-	Price       float64 `mapstructure:"price"`
-}
-
 func handleError(err error, msg string, status int) (events.APIGatewayProxyResponse, error) {
 	err = errors.Wrap(err, msg)
 	log.Println(err.Error())
@@ -84,7 +49,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) 
 	if err != nil {
 		return handleError(err, "failed to decompress the body", 400)
 	}
-	var v1Events []Event
+	var v1Events []v1model.Event
 	err = json.Unmarshal(decoded, &v1Events)
 	if err != nil {
 		return handleError(err, "failed to unmarshal the body", 400)
@@ -94,51 +59,23 @@ func HandleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) 
 	var cars []any
 	var deals []any
 	for _, event := range v1Events {
-		reporter := model.Reporter{
-			IsV1:       true,
-			InstanceID: event.Instance,
-			IP:         request.RequestContext.HTTP.SourceIP,
-		}
 		switch event.Type {
 		case "deal_proposed":
-			var dealProposal DealProposalEvent
+			var dealProposal v1model.DealProposalEvent
 			err = mapstructure.Decode(event.Values, &dealProposal)
 			if err != nil {
 				return handleError(err, "failed to decode deal_proposed event", 400)
 			}
-			deal := model.Deal{
-				Reporter:  reporter,
-				Client:    dealProposal.Client,
-				Provider:  dealProposal.Provider,
-				Label:     dealProposal.DataCID,
-				PieceCID:  dealProposal.PieceCID,
-				PieceSize: dealProposal.PieceSize,
-				Verified:  dealProposal.Verified,
-				Price:     dealProposal.Price,
-				Duration:  dealProposal.Duration,
-				DealOnChain: model.DealOnChain{
-					State: "proposed",
-				},
-			}
+			deal := dealProposal.ToDeal(event.Timestamp, event.Instance, request.RequestContext.HTTP.SourceIP)
 			deals = append(deals, deal)
 
 		case "generation_complete":
-			var generation GenerationCompleteEvent
+			var generation v1model.GenerationCompleteEvent
 			err = mapstructure.Decode(event.Values, &generation)
 			if err != nil {
 				return handleError(err, "failed to decode generation_complete event", 400)
 			}
-			car := model.Car{
-				Reporter:    reporter,
-				DatasetName: generation.DatasetName,
-				CreatedAt:   time.Unix(event.Timestamp, 0),
-				CarID:       generation.Index,
-				PieceCID:    generation.PieceCID,
-				PieceSize:   generation.PieceSize,
-				FileSize:    generation.CarSize,
-				NumOfFiles:  generation.NumOfFiles,
-				TimeSpent:   time.Duration(generation.TimeSpentInGenerationMs+generation.TimeSpentInMovingToTmpdirMs) * time.Millisecond,
-			}
+			car := generation.ToCar(event.Timestamp, event.Instance, request.RequestContext.HTTP.SourceIP)
 			cars = append(cars, car)
 		}
 	}
