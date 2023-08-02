@@ -226,14 +226,15 @@ func getKnownDeals(ctx context.Context, mg *mongo.Client) (map[uint64]KnownDeal,
 }
 
 type VerifiedClient struct {
-	ID        int32  `json:"id" bson:"id"`
-	AddressID string `json:"addressId" bson:"addressId"`
-	Address   string `json:"address" bson:"address"`
-	Name      string `json:"name" bson:"name"`
-	OrgName   string `json:"orgName" bson:"orgName"`
-	Region    string `json:"region" bson:"region"`
-	Website   string `json:"website" bson:"website"`
-	Industry  string `json:"industry" bson:"industry"`
+	ID               int32  `json:"id" bson:"id"`
+	AddressID        string `json:"addressId" bson:"addressId"`
+	Address          string `json:"address" bson:"address"`
+	Name             string `json:"name" bson:"name"`
+	OrgName          string `json:"orgName" bson:"orgName"`
+	Region           string `json:"region" bson:"region"`
+	Website          string `json:"website" bson:"website"`
+	Industry         string `json:"industry" bson:"industry"`
+	InitialAllowance string `json:"initialAllowance" bson:"initialAllowance"`
 }
 
 func updateVerifiedClients(ctx context.Context, mg *mongo.Client) error {
