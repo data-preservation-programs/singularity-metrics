@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -224,10 +225,59 @@ func getKnownDeals(ctx context.Context, mg *mongo.Client) (map[uint64]KnownDeal,
 	return ids, nil
 }
 
+type VerifiedClient struct {
+	ID        int32  `json:"id" bson:"id"`
+	AddressID string `json:"addressId" bson:"addressId"`
+	Address   string `json:"address" bson:"address"`
+	Name      string `json:"name" bson:"name"`
+	OrgName   string `json:"orgName" bson:"orgName"`
+	Region    string `json:"region" bson:"region"`
+	Website   string `json:"website" bson:"website"`
+	Industry  string `json:"industry" bson:"industry"`
+}
+
+func updateVerifiedClients(ctx context.Context, mg *mongo.Client) error {
+	resp, err := http.NewRequestWithContext(ctx, http.MethodGet, "https://api.datacapstats.io/api/getVerifiedClients", nil)
+	if err != nil {
+		return errors.Wrap(err, "failed to create request")
+	}
+	client := http.DefaultClient
+	result, err := client.Do(resp)
+	if err != nil {
+		return errors.Wrap(err, "failed to get verified clients")
+	}
+	defer result.Body.Close()
+	var respBody struct {
+		Data []VerifiedClient `json:"data"`
+	}
+	err = json.NewDecoder(result.Body).Decode(&respBody)
+	if err != nil {
+		return errors.Wrap(err, "failed to decode response")
+	}
+	for _, vClient := range respBody.Data {
+		updateResult, err := mg.Database("singularity").Collection("verifiedClients").UpdateOne(ctx,
+			bson.M{"id": vClient.ID}, bson.M{"$set": vClient}, options.Update().SetUpsert(true))
+		if err != nil {
+			return errors.Wrap(err, "failed to update verified client")
+		}
+		if updateResult.UpsertedCount > 0 {
+			log.Printf("inserted verified client %d\n", vClient.ID)
+		} else {
+			log.Printf("updated verified client %d\n", vClient.ID)
+		}
+	}
+	return nil
+}
+
 func run(ctx context.Context) error {
 	mg, err := mongo.Connect(context.Background(), options.Client().ApplyURI(os.Getenv("MONGODB_URI")))
 	if err != nil {
 		return errors.Wrap(err, "failed to connect to mongo")
+	}
+
+	err = updateVerifiedClients(ctx, mg)
+	if err != nil {
+		return errors.Wrap(err, "failed to update verified clients")
 	}
 
 	clientResolver, err := NewClientMappingResolver(ctx, mg)
