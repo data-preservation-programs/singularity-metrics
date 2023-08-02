@@ -396,7 +396,7 @@ func run(ctx context.Context) error {
 	log.Printf("marked %d deals as expired\n", markExpiredResult.ModifiedCount)
 	markProposalExpiredResult, err := mg.Database("singularity").Collection(dealsCollection).UpdateMany(
 		ctx, bson.M{"state": bson.M{"$in": bson.A{"proposed", "published"}}, "$or": bson.A{
-			bson.M{"startEpoch": bson.M{"$lt": currentEpoch}},
+			bson.M{"startEpoch": bson.M{"$lt": currentEpoch, "$gt": 0}},
 			bson.M{"createdAt": bson.M{"$lt": time.Now().Add(-time.Hour * 24 * 30)}},
 		}},
 		bson.M{"$set": bson.M{"state": "proposal_expired"}})
