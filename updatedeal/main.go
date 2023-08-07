@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"strconv"
+	"strings"
 	"time"
 
 	"github.com/bcicen/jstream"
@@ -225,7 +226,24 @@ func getKnownDeals(ctx context.Context, mg *mongo.Client) (map[uint64]KnownDeal,
 	return ids, nil
 }
 
-type VerifiedClient struct {
+type VerifiedClientResponse struct {
+	ID               int32            `json:"id"`
+	AddressID        string           `json:"addressId"`
+	Address          string           `json:"address"`
+	Name             string           `json:"name"`
+	OrgName          string           `json:"orgName"`
+	Region           string           `json:"region"`
+	Website          string           `json:"website"`
+	Industry         string           `json:"industry"`
+	InitialAllowance string           `json:"initialAllowance"`
+	AllowanceArray   []AllowanceArray `json:"allowanceArray"`
+}
+
+type AllowanceArray struct {
+	AuditTrail string `json:"auditTrail"`
+}
+
+type VerifiedClientEntry struct {
 	ID               int32  `json:"id" bson:"id"`
 	AddressID        string `json:"addressId" bson:"addressId"`
 	Address          string `json:"address" bson:"address"`
@@ -235,6 +253,7 @@ type VerifiedClient struct {
 	Website          string `json:"website" bson:"website"`
 	Industry         string `json:"industry" bson:"industry"`
 	InitialAllowance string `json:"initialAllowance" bson:"initialAllowance"`
+	AuditTrail       string `json:"auditTrail" bson:"auditTrail"`
 }
 
 func updateVerifiedClients(ctx context.Context, mg *mongo.Client) error {
@@ -249,22 +268,39 @@ func updateVerifiedClients(ctx context.Context, mg *mongo.Client) error {
 	}
 	defer result.Body.Close()
 	var respBody struct {
-		Data []VerifiedClient `json:"data"`
+		Data []VerifiedClientResponse `json:"data"`
 	}
 	err = json.NewDecoder(result.Body).Decode(&respBody)
 	if err != nil {
 		return errors.Wrap(err, "failed to decode response")
 	}
 	for _, vClient := range respBody.Data {
+		entry := VerifiedClientEntry{
+			ID:               vClient.ID,
+			AddressID:        vClient.AddressID,
+			Address:          vClient.Address,
+			Name:             vClient.Name,
+			OrgName:          vClient.OrgName,
+			Region:           vClient.Region,
+			Website:          vClient.Website,
+			Industry:         vClient.Industry,
+			InitialAllowance: vClient.InitialAllowance,
+		}
+		for _, v := range vClient.AllowanceArray {
+			if strings.HasPrefix(v.AuditTrail, "https://") {
+				entry.AuditTrail = v.AuditTrail
+				break
+			}
+		}
 		updateResult, err := mg.Database("singularity").Collection("verifiedClients").UpdateOne(ctx,
-			bson.M{"id": vClient.ID}, bson.M{"$set": vClient}, options.Update().SetUpsert(true))
+			bson.M{"id": entry.ID}, bson.M{"$set": entry}, options.Update().SetUpsert(true))
 		if err != nil {
 			return errors.Wrap(err, "failed to update verified client")
 		}
 		if updateResult.UpsertedCount > 0 {
-			log.Printf("inserted verified client %d\n", vClient.ID)
+			log.Printf("inserted verified client %d\n", entry.ID)
 		} else {
-			log.Printf("updated verified client %d\n", vClient.ID)
+			log.Printf("updated verified client %d\n", entry.ID)
 		}
 	}
 	return nil
