@@ -15,16 +15,17 @@ type Reporter struct {
 type Car struct {
 	Reporter    `bson:",inline"`
 	DatasetID   *uint32       `bson:"datasetId,omitempty"`
-	DatasetName string        `bson:"datasetName"`
+	DatasetName string        `bson:"datasetName,omitempty"`
 	SourceType  *string       `bson:"sourceType,omitempty"`
+	OutputType  *string       `bson:"outputType,omitempty"`
 	SourceID    *uint32       `bson:"sourceId,omitempty"`
 	CreatedAt   time.Time     `bson:"createdAt"`
-	CarID       int64         `bson:"carId"`
+	CarID       int64         `bson:"carId,omitempty"`
 	PieceCID    string        `bson:"pieceCid"`
 	PieceSize   int64         `bson:"pieceSize"`
 	FileSize    int64         `bson:"fileSize"`
 	NumOfFiles  int64         `bson:"numOfFiles"`
-	TimeSpent   time.Duration `bson:"timeSpent"`
+	TimeSpent   time.Duration `bson:"timeSpent,omitempty"`
 }
 
 type Deal struct {
@@ -45,8 +46,6 @@ type Deal struct {
 	EndEpoch         *int32    `bson:"endEpoch,omitempty"`
 	Verified         bool      `bson:"verified"`
 	KeepUnsealed     *bool     `bson:"keepUnsealed,omitempty"`
-	IPNI             *bool     `bson:"ipni,omitempty"`
-	ScheduleCron     *string   `bson:"scheduleCron,omitempty"`
 	Price            float64   `bson:"price"` // Fil per epoch per GiB
 }
 
