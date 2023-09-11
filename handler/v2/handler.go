@@ -79,7 +79,6 @@ func ToDeal(event metrics.DealProposalEvent, ip string) model.Deal {
 		PieceCID:   event.PieceCID,
 		PieceSize:  event.PieceSize,
 		Verified:   event.Verified,
-		Price:      event.Price,
 		Duration:   event.EndEpoch - event.StartEpoch,
 		State:      "proposed",
 		StartEpoch: ptr.Of(event.StartEpoch),
@@ -87,7 +86,7 @@ func ToDeal(event metrics.DealProposalEvent, ip string) model.Deal {
 	}
 }
 
-func HandleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) (events.APIGatewayProxyResponse, error) {
+func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (events.APIGatewayProxyResponse, error) {
 	// Decode the request body with base64
 	decoded, err := base64.StdEncoding.DecodeString(request.Body)
 	if err != nil {
@@ -108,10 +107,10 @@ func HandleRequest(ctx context.Context, request events.APIGatewayV2HTTPRequest) 
 	log.Printf("Received %d pack v2events and %d deal v2events\n", len(v2events.PackJobEvents), len(v2events.DealEvents))
 
 	cars := underscore.Map(v2events.PackJobEvents, func(event metrics.PackJobEvent) any {
-		return ToCar(event, request.RequestContext.HTTP.SourceIP)
+		return ToCar(event, request.RequestContext.Identity.SourceIP)
 	})
 	deals := underscore.Map(v2events.DealEvents, func(event metrics.DealProposalEvent) any {
-		return ToDeal(event, request.RequestContext.HTTP.SourceIP)
+		return ToDeal(event, request.RequestContext.Identity.SourceIP)
 	})
 
 	log.Printf("Inserting %d cars and %d deals\n", len(cars), len(deals))
