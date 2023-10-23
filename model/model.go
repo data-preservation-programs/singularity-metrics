@@ -10,6 +10,7 @@ type Reporter struct {
 	IsV1       bool   `bson:"isV1"`
 	InstanceID string `bson:"instanceId"`
 	IP         string `bson:"ip"`
+	Identity   string `bson:"identity"`
 }
 
 type Car struct {

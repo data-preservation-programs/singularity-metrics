@@ -11,7 +11,7 @@ import (
 
 	"github.com/aws/aws-lambda-go/events"
 	"github.com/data-preservation-programs/singularity-metrics/model"
-	"github.com/data-preservation-programs/singularity/metrics"
+	"github.com/data-preservation-programs/singularity/analytics"
 	"github.com/fxamacker/cbor/v2"
 	"github.com/gotidy/ptr"
 	"github.com/klauspost/compress/zstd"
@@ -42,7 +42,7 @@ func handleError(err error, msg string, status int) (events.APIGatewayProxyRespo
 	return events.APIGatewayProxyResponse{Body: err.Error(), StatusCode: status}, nil
 }
 
-func ToCar(event metrics.PackJobEvent, ip string) model.Car {
+func ToCar(event analytics.PackJobEvent, ip string) model.Car {
 	var outputType *string
 	if event.OutputType != "" {
 		outputType = ptr.Of(event.OutputType)
@@ -54,6 +54,7 @@ func ToCar(event metrics.PackJobEvent, ip string) model.Car {
 			IsV1:       false,
 			InstanceID: event.Instance,
 			IP:         ip,
+			Identity:   event.Identity,
 		},
 		SourceType: ptr.Of(event.SourceType),
 		OutputType: outputType,
@@ -65,12 +66,13 @@ func ToCar(event metrics.PackJobEvent, ip string) model.Car {
 	}
 }
 
-func ToDeal(event metrics.DealProposalEvent, ip string) model.Deal {
+func ToDeal(event analytics.DealProposalEvent, ip string) model.Deal {
 	return model.Deal{
 		Reporter: model.Reporter{
 			IsV1:       false,
 			InstanceID: event.Instance,
 			IP:         ip,
+			Identity:   event.Identity,
 		},
 		CreatedAt:  time.Unix(event.Timestamp, 0),
 		Client:     event.Client,
@@ -98,7 +100,7 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 		return handleError(err, "failed to decompress the body", 400)
 	}
 
-	var v2events metrics.Events
+	var v2events analytics.Events
 	err = cbor.NewDecoder(bytes.NewReader(decoded)).Decode(&v2events)
 	if err != nil {
 		return handleError(err, "failed to unmarshal the body", 400)
@@ -106,10 +108,10 @@ func HandleRequest(ctx context.Context, request events.APIGatewayProxyRequest) (
 
 	log.Printf("Received %d pack v2events and %d deal v2events\n", len(v2events.PackJobEvents), len(v2events.DealEvents))
 
-	cars := underscore.Map(v2events.PackJobEvents, func(event metrics.PackJobEvent) any {
+	cars := underscore.Map(v2events.PackJobEvents, func(event analytics.PackJobEvent) any {
 		return ToCar(event, request.RequestContext.Identity.SourceIP)
 	})
-	deals := underscore.Map(v2events.DealEvents, func(event metrics.DealProposalEvent) any {
+	deals := underscore.Map(v2events.DealEvents, func(event analytics.DealProposalEvent) any {
 		return ToDeal(event, request.RequestContext.Identity.SourceIP)
 	})
 
